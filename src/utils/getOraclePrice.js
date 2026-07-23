@@ -17,8 +17,15 @@ export const getOraclePrice = async ({
   op3,
   network = "Obyte",
   oracle,
-  home_asset
+  home_asset,
+  home_network,
+  quote_asset = "_NATIVE_",
+  silent = false
 }) => {
+  const showError = (error) => {
+    if (!silent) message.error(error);
+  };
+
   if (network === "Obyte") {
     let price = 1;
     if (oracle1 && feed_name1 && op1) {
@@ -31,15 +38,15 @@ export const getOraclePrice = async ({
         if (data_feed !== "none") {
           price = price * (op1 === "/" ? 1 / data_feed : data_feed);
         } else {
-          message.error("Oracle 1 is not found!");
+          showError("Oracle 1 is not found!");
           return [false];
         }
       } catch {
-        message.error("Oracle 1 is not found!");
+        showError("Oracle 1 is not found!");
         return [false];
       }
     } else if (oracle1 || feed_name1) {
-      message.error("Not all data for oracle 1 is specified!");
+      showError("Not all data for oracle 1 is specified!");
       return [false];
     }
 
@@ -53,15 +60,15 @@ export const getOraclePrice = async ({
         if (data_feed !== "none") {
           price = price * (op2 === "/" ? 1 / data_feed : data_feed);
         } else {
-          message.error("Oracle 2 is not found!");
+          showError("Oracle 2 is not found!");
           return [false];
         }
       } catch (e) {
-        message.error("Oracle 2 is not found!");
+        showError("Oracle 2 is not found!");
         return [false];
       }
     } else if (oracle2 || feed_name2) {
-      message.error("Not all data for oracle 2 is specified!");
+      showError("Not all data for oracle 2 is specified!");
       return [false];
     }
 
@@ -75,15 +82,15 @@ export const getOraclePrice = async ({
         if (data_feed !== "none") {
           price = price * (op3 === "/" ? 1 / data_feed : data_feed);
         } else {
-          message.error("Oracle 3 is not found!");
+          showError("Oracle 3 is not found!");
           return [false];
         }
       } catch (e) {
-        message.error("Oracle 3 is not found!");
+        showError("Oracle 3 is not found!");
         return [false];
       }
     } else if (oracle3 || feed_name3) {
-      message.error("Not all data for oracle 3 is specified!");
+      showError("Not all data for oracle 3 is specified!");
       return [false];
     }
 
@@ -93,7 +100,10 @@ export const getOraclePrice = async ({
 
     try {
       const contract = new ethers.Contract(oracle, oracleAbi, providers[network]);
-      const result = await contract.getPrice(home_asset, "_NATIVE_");
+      const oracleBase = home_network && (home_asset === "base" || home_asset === ethers.constants.AddressZero)
+        ? home_network
+        : home_asset;
+      const result = await contract.getPrice(oracleBase, quote_asset);
 
       if (("den" in result) && ("num" in result) && !BigNumber.from(result.num.toString()).isZero() && !BigNumber.from(result.den.toString()).isZero()) {
         const price = result.num.toString() / result.den.toString()

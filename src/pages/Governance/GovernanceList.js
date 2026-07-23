@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 
 import { GovernanceItem } from "./GovernanceItem";
 
-export const GovernanceList = ({ paramsInfo, selectedBridgeAddress, bridge_network, bridge_symbol, bridge_decimals, activeGovernance, voteTokenDecimals, voteTokenSymbol, voteTokenAddress, freeze_period, challenging_period, activeWallet, balance, home_asset_decimals, stakeTokenDecimals, stakeTokenSymbol, stakeTokenAddress, }) => {
+export const GovernanceList = ({ paramsInfo, selectedBridgeAddress, bridge_network, bridge_symbol, bridge_decimals, home_asset, home_network, activeGovernance, voteTokenDecimals, voteTokenSymbol, voteTokenAddress, freeze_period, challenging_period, activeWallet, balance, home_asset_decimals, stakeTokenDecimals, stakeTokenSymbol, stakeTokenAddress, }) => {
   const [data, setData] = useState([]);
   
   useEffect(async () => {
@@ -40,6 +40,9 @@ export const GovernanceList = ({ paramsInfo, selectedBridgeAddress, bridge_netwo
         bridge_network={bridge_network}
         bridge_decimals={bridge_decimals}
         bridge_symbol={bridge_symbol}
+        home_asset={home_asset}
+        home_network={home_network}
+        oracleAddress={paramsInfo?.oracles?.value}
 
         balance={balance}
         activeWallet={activeWallet}

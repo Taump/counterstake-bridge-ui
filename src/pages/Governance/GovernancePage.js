@@ -84,6 +84,8 @@ export const GovernancePage = () => {
         bridge_network={bridge_network}
         bridge_symbol={bridge_symbol}
         bridge_decimals={bridge_decimals}
+        home_asset={bridgeAAs[selectedBridgeAddress]?.home_asset}
+        home_network={bridgeAAs[selectedBridgeAddress]?.home_network}
 
         home_asset_decimals={home_asset_decimals}
         selectedBridgeAddress={selectedBridgeAddress}

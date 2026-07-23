@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Modal, Form, Input, Button, Space, Typography, Select, Row, Col, Alert, Tooltip } from "antd";
+import { Modal, Form, Input, Button, Space, Typography, Select, Row, Col, Alert, Tooltip, Spin } from "antd";
 import obyte from "obyte";
 import { useDispatch } from "react-redux";
 import QRButton from "obyte-qr-button";
 import { BigNumber, ethers } from "ethers";
 
 import { generateLink, getEvmErrorMessage } from "utils";
+import { useOraclePrice } from "hooks/useOraclePrice";
 import { EVMBridgeGovernance } from "pages/Governance/utils/EVMBridgeGovernance";
 import { getParameterList } from "pages/Governance/utils/getParameterList";
 import { updateActiveGovernanceAA } from "store/thunks/updateActiveGovernanceAA";
@@ -13,13 +14,26 @@ import { ChangeAddressModal } from "./ChangeAddressModal";
 import { checkOracles } from "utils/checkOracles";
 
 const { Text, Paragraph } = Typography;
+const formatOraclePrice = (price) => Number(price).toLocaleString("en-US", {
+  maximumSignificantDigits: 10,
+  useGrouping: false
+});
 
-export const ChangeParamsModal = ({ supportedValue, description, name, activeGovernance, bridge_network, bridge_decimals, voteTokenAddress, voteTokenDecimals, voteTokenSymbol, stakeTokenDecimals, balance = 0, selectedBridgeAddress, isMyChoice, activeWallet, disabled, disabledReason }) => {
+export const ChangeParamsModal = ({ supportedValue, description, name, activeGovernance, bridge_network, bridge_symbol, bridge_decimals, home_asset, home_network, oracleAddress, voteTokenAddress, voteTokenDecimals, voteTokenSymbol, stakeTokenAddress, stakeTokenDecimals, stakeTokenSymbol, balance = 0, selectedBridgeAddress, isMyChoice, activeWallet, disabled, disabledReason }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [oracles, setOracles] = useState({});
   const [checkedOracle, setCheckedOracle] = useState(undefined);
   const btnRef = useRef();
   const dispatch = useDispatch();
+  const oraclePrice = useOraclePrice({
+    enabled: isModalVisible && name === "min_price",
+    network: bridge_network,
+    homeAsset: home_asset,
+    homeNetwork: home_network,
+    oracleAddress,
+    stakeTokenAddress,
+    stakeTokenSymbol
+  });
 
   const [paramValue, setParamValue] = useState({
     value: undefined,
@@ -265,6 +279,14 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
         }
       >
         {description && <Alert style={{ marginBottom: 15 }} message={description} type="info" showIcon />}
+        {name === "min_price" && <Paragraph>
+          <Text strong>Current oracle price: </Text>
+          {oraclePrice.loading || oraclePrice.valid === undefined
+            ? <Spin size="small" />
+            : oraclePrice.valid
+              ? <Text>1 {bridge_symbol || "foreign asset"} = {formatOraclePrice(oraclePrice.value)} {stakeTokenSymbol || "stake asset"}</Text>
+              : <Text type="secondary">Unavailable</Text>}
+        </Paragraph>}
         <Form size="middle" layout="vertical">
           <Text type="secondary">Parameter value:</Text>
           {(!(name === "oracles" && bridge_network === "Obyte")) ? <Form.Item
