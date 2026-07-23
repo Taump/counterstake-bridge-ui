@@ -94,12 +94,14 @@ export const changeActiveGovernanceAA = createAsyncThunk(
       governance_aa = await EVM.getGovernanceContractAddress();
 
       voteTokenAddress = await EVM.getVotingTokenAddress();
+      stakeTokenAddress = type === "import" ? stake_asset : home_asset;
 
-      [voteTokenDecimals, voteTokenSymbol] = await Promise.all([getDecimals(voteTokenAddress, bridge_network), getSymbol(voteTokenAddress, bridge_network)])
-
-      stakeTokenAddress = voteTokenAddress;
-      stakeTokenDecimals = voteTokenDecimals;
-      stakeTokenSymbol = voteTokenSymbol;
+      [voteTokenDecimals, voteTokenSymbol, stakeTokenDecimals, stakeTokenSymbol] = await Promise.all([
+        getDecimals(voteTokenAddress, bridge_network),
+        getSymbol(voteTokenAddress, bridge_network),
+        getDecimals(stakeTokenAddress, bridge_network),
+        getSymbol(stakeTokenAddress, bridge_network)
+      ]);
 
       if (walletAddress && window.ethereum) {
         const balanceBn = await EVM.getBalance(walletAddress);
