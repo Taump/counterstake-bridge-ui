@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { ChangeParamsModal } from "./ChangeParamsModal";
+import { EVMBridgeGovernance } from "pages/Governance/utils/EVMBridgeGovernance";
 import { getOraclePrice } from "utils/getOraclePrice";
 
 jest.mock("react-redux", () => ({
@@ -57,7 +58,23 @@ beforeAll(() => {
 
 beforeEach(() => {
   getOraclePrice.mockReset();
+  EVMBridgeGovernance.mockReset();
 });
+
+// Votes for an already suggested value and returns the changeParam() mock it was sent to.
+const voteForSupportedValue = async (props) => {
+  const changeParam = jest.fn();
+  EVMBridgeGovernance.mockImplementation(() => ({ changeParam }));
+
+  render(<ChangeParamsModal {...defaultProps} {...props} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "vote for this value" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Vote" }));
+
+  await waitFor(() => expect(changeParam).toHaveBeenCalled());
+
+  return changeParam;
+};
 
 test("loads and displays the current oracle price in the min price modal", async () => {
   getOraclePrice.mockResolvedValue([true, 0.00325]);
@@ -101,6 +118,85 @@ test("uses an ERC20 bridge stake asset as the EVM oracle quote", async () => {
 
   expect(await screen.findByText("1 GBYTE = 1.25 STAKE")).toBeInTheDocument();
   expect(screen.getByPlaceholderText("Amount in GBYTE")).toBeInTheDocument();
+});
+
+// parseUnits() only accepts strings, so a value read from the contract must not be turned into a
+// number on its way back — that used to fail the vote with "value must be a string".
+test("sends an already suggested large_threshold back as a string", async () => {
+  const changeParam = await voteForSupportedValue({
+    name: "large_threshold",
+    supportedValue: "10000000000000000000",
+    balance: "480030000000000"
+  });
+
+  expect(changeParam).toHaveBeenCalledWith("large_threshold", "10", undefined, expect.any(Function));
+});
+
+// Number() would turn this into 1e-8, which parseUnits() rejects as an invalid decimal value.
+test("keeps a small min_price exact instead of using exponential notation", async () => {
+  getOraclePrice.mockResolvedValue([true, 0.00325]);
+
+  const changeParam = await voteForSupportedValue({
+    supportedValue: "1000000000000",
+    balance: "480030000000000"
+  });
+
+  expect(changeParam).toHaveBeenCalledWith("min_price", "0.00000001", undefined, expect.any(Function));
+});
+
+// The submit button is reached through a ref, and it is now wrapped in a Tooltip.
+test("still submits on Enter", async () => {
+  const changeParam = jest.fn();
+  EVMBridgeGovernance.mockImplementation(() => ({ changeParam }));
+
+  render(<ChangeParamsModal
+    {...defaultProps}
+    name="large_threshold"
+    supportedValue="10000000000000000000"
+    balance="480030000000000"
+  />);
+
+  fireEvent.click(screen.getByRole("button", { name: "vote for this value" }));
+  fireEvent.keyPress(screen.getByPlaceholderText("Amount in GBYTE"), { key: "Enter", code: "Enter", charCode: 13 });
+
+  await waitFor(() => expect(changeParam).toHaveBeenCalled());
+});
+
+// A vote recounts the whole current balance, so re-voting for your own choice still raises its
+// support after a later deposit — the modal used to demand new funds for it regardless.
+const openOwnChoice = async (props) => {
+  EVMBridgeGovernance.mockImplementation(() => ({ changeParam: jest.fn() }));
+
+  render(<ChangeParamsModal
+    {...defaultProps}
+    name="large_threshold"
+    supportedValue="10000000000000000000"
+    balance="480030000000000"
+    isMyChoice
+    {...props}
+  />);
+
+  fireEvent.click(screen.getByRole("button", { name: "add support for this value" }));
+
+  return screen.getByRole("button", { name: "Vote" });
+};
+
+test("allows re-voting for your own choice when your balance outgrew its recorded support", async () => {
+  const vote = await openOwnChoice({ myChoiceSupport: "10000000" });
+
+  expect(vote).toBeEnabled();
+  expect(screen.getByText("Add more funds (optional):")).toBeInTheDocument();
+});
+
+test("requires new funds only once the recorded support covers the whole balance", async () => {
+  const vote = await openOwnChoice({ myChoiceSupport: "480030000000000" });
+
+  expect(vote).toBeDisabled();
+  expect(screen.getByText("Add more funds:")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByPlaceholderText("Amount in GBYTE"), { target: { value: "0.0001" } });
+
+  expect(screen.getByRole("button", { name: "Vote" })).toBeEnabled();
 });
 
 test("loads and displays a composed Obyte oracle price", async () => {

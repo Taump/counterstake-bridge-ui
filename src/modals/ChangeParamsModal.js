@@ -19,7 +19,16 @@ const formatOraclePrice = (price) => Number(price).toLocaleString("en-US", {
   useGrouping: false
 });
 
-export const ChangeParamsModal = ({ supportedValue, description, name, activeGovernance, bridge_network, bridge_symbol, bridge_decimals, home_asset, home_network, oracleAddress, voteTokenAddress, voteTokenDecimals, voteTokenSymbol, stakeTokenAddress, stakeTokenDecimals, stakeTokenSymbol, balance = 0, selectedBridgeAddress, isMyChoice, activeWallet, disabled, disabledReason }) => {
+// The parameter value must stay a string all the way down to parseUnits() in EVMBridgeGovernance:
+// it rejects numbers outright, and Number() would both lose precision on long values and turn
+// small ones (min_price has 20 decimals) into exponential notation that parseUnits can't read.
+// formatUnits always keeps at least one decimal digit ("10.0"), so trim the tail for display.
+const formatParamUnits = (value, decimals) => {
+  const formatted = ethers.utils.formatUnits(BigNumber.from(value), decimals);
+  return formatted.includes(".") ? formatted.replace(/\.?0+$/, "") : formatted;
+};
+
+export const ChangeParamsModal = ({ supportedValue, description, name, activeGovernance, bridge_network, bridge_symbol, bridge_decimals, home_asset, home_network, oracleAddress, voteTokenAddress, voteTokenDecimals, voteTokenSymbol, stakeTokenAddress, stakeTokenDecimals, stakeTokenSymbol, balance = 0, selectedBridgeAddress, isMyChoice, myChoiceSupport, activeWallet, disabled, disabledReason }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [oracles, setOracles] = useState({});
   const [checkedOracle, setCheckedOracle] = useState(undefined);
@@ -160,9 +169,9 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
     if (supportedValue !== undefined && bridge_network !== "Obyte" && (name === "ratio" || name === "counterstake_coef")) {
       transformedValue = supportedValue / 100
     } else if (supportedValue !== undefined && (name === "large_threshold" || name === "min_stake")) {
-      transformedValue = +ethers.utils.formatUnits(BigNumber.from(supportedValue), stakeTokenDecimals);
+      transformedValue = formatParamUnits(supportedValue, stakeTokenDecimals);
     } else if (supportedValue !== undefined && bridge_network !== "Obyte" && name === "min_price") {
-      transformedValue = +ethers.utils.formatUnits(BigNumber.from(supportedValue), 20);
+      transformedValue = formatParamUnits(supportedValue, 20);
     } else if (supportedValue !== undefined && bridge_network !== "Obyte" && (name === "challenging_periods" || name === "large_challenging_periods")) {
       const periods = Array.isArray(supportedValue) ? supportedValue : String(supportedValue).split(" ").map(Number);
       transformedValue = periods.map((v) => v / 3600).join(" ");
@@ -211,9 +220,18 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
 
   const finalSupport = Number(balance) + (amount.valid ? Number(amount.value * 10 ** voteTokenDecimals) : 0);
 
+  // A vote always recounts your whole current balance, so voting again for your own choice still
+  // raises its support as long as you deposited something since. Only when the recorded support
+  // already covers the balance does adding funds become the sole way to change anything.
+  const supportAlreadyCounted = Boolean(isMyChoice) && myChoiceSupport !== undefined && finalSupport <= Number(myChoiceSupport);
+
+  const cannotVote = paramValue.value === undefined || paramValue.value === "" || !paramValue.valid || finalSupport === 0 || supportAlreadyCounted;
+
+  const alreadyCountedReason = "Your entire balance is already counted as support for this value, so voting again would change nothing. Add more funds to increase your support.";
+
   const handleKeyPress = (ev) => {
     if (ev.key === "Enter") {
-      if (finalSupport !== 0 && paramValue.valid) {
+      if (!cannotVote) {
         btnRef.current.click();
       }
     }
@@ -246,35 +264,31 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
                 onClick={async () => checkOracles(oracles).then((value) => setCheckedOracle(value))}
               >
                 Check
-              </Button> : <QRButton
-                key="submit"
+              </Button> : <Tooltip title={supportAlreadyCounted ? alreadyCountedReason : null}>
+                <QRButton
+                  key="submit"
+                  type="primary"
+                  href={link}
+                  style={{ margin: 0 }}
+                  disabled={cannotVote}
+                  onClick={() =>
+                    setTimeout(() => {
+                      handleCancel();
+                    }, 100)
+                  }
+                >
+                  {isMyChoice ? "Add support" : "Vote"}
+                </QRButton>
+              </Tooltip>}
+            </> : <Tooltip title={supportAlreadyCounted ? alreadyCountedReason : null}>
+              <Button
+                key="check"
                 type="primary"
-                href={link}
-                style={{ margin: 0 }}
-                disabled={
-                  paramValue.value === undefined || paramValue.value === "" || !paramValue.valid || (isMyChoice
-                    ? Number(amount.value) === 0 || !amount.valid
-                    : finalSupport === 0 || !paramValue.valid)
-                }
-                onClick={() =>
-                  setTimeout(() => {
-                    handleCancel();
-                  }, 100)
-                }
-              >
-                {isMyChoice ? "Add support" : "Vote"}
-              </QRButton>}
-            </> : <Button
-              key="check"
-              type="primary"
-              ref={btnRef}
-              disabled={
-                paramValue.value === undefined || paramValue.value === "" || paramValue.valid === undefined || !paramValue.valid || (isMyChoice
-                  ? Number(amount.value) === 0 || !amount.valid
-                  : finalSupport === 0 || !paramValue.valid)
-              }
-              loading={loading}
-              onClick={vote}>Vote</Button>}
+                ref={btnRef}
+                disabled={cannotVote}
+                loading={loading}
+                onClick={vote}>Vote</Button>
+            </Tooltip>}
           </Space>
         }
       >
@@ -427,7 +441,7 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
                 </Col>
               </Row>
             </div>)}
-          {balance !== 0 && balance !== "0" ? <Text type="secondary">Add more funds (optional):</Text> : <Text>Amount to vote with</Text>}
+          {balance !== 0 && balance !== "0" ? <Text type="secondary">Add more funds{supportAlreadyCounted ? "" : " (optional)"}:</Text> : <Text>Amount to vote with</Text>}
           <Form.Item validateStatus={error ? "error" : undefined} help={error}>
             <Input
               placeholder={`Amount in ${voteTokenSymbol || "TOKEN"}`}

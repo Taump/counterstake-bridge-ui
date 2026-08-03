@@ -88,11 +88,11 @@ export class EVMBridgeGovernance {
     if (['ratio', 'counterstake_coef'].includes(name)) {
       transformedValue = +Number(Number(newValue) * 100).toFixed(3)
     } else if (name === "min_price") {
-      transformedValue = ethers.utils.parseUnits(newValue, 20).toString();
+      transformedValue = ethers.utils.parseUnits(String(newValue), 20).toString();
     } else if (['challenging_periods', 'large_challenging_periods'].includes(name)) {
       transformedValue = String(newValue).split(" ").map((v) => BigNumber.from(String(Number(v * 3600))));
     } else if (name === "min_stake" || name === "large_threshold") {
-      transformedValue = ethers.utils.parseUnits(newValue, this.stake_asset_decimals).toString();
+      transformedValue = ethers.utils.parseUnits(String(newValue), this.stake_asset_decimals).toString();
     } else {
       transformedValue = newValue;
     }
@@ -279,10 +279,27 @@ export class EVMBridgeGovernance {
     return BigNumber.from(balanceBn).toString();
   }
 
+  // votedValues is a public array: its getter takes an index and there is no length to read, so
+  // the array can't be walked. Resolving every parameter by name gets the same set in one call.
+  // Parameters this bridge doesn't govern (import-only ones on an export bridge) map to the zero
+  // address and are left out.
   async getParamContracts() {
-    const governance_contract = await this.getGovernanceContract();
+    const governance_address = await this.getGovernanceContractAddress();
+    const keys = Object.keys(this.parameterList);
 
-    return await governance_contract.votedValues();
+    const results = await this._multicall(keys.map((key) => ({
+      target: governance_address,
+      callData: govIface.encodeFunctionData("votedValuesMap", [this.parameterList[key].evm_name || this.parameterList[key].name])
+    })));
+
+    const contracts = {};
+    keys.forEach((key, i) => {
+      if (!results[i].success) return;
+      const address = govIface.decodeFunctionResult("votedValuesMap", results[i].returnData)[0];
+      if (address !== ethers.constants.AddressZero) contracts[key] = address;
+    });
+
+    return contracts;
   }
 
   getSigner() {
@@ -502,6 +519,10 @@ export class EVMBridgeGovernance {
         if (data.choice && !data.choice.isZero()) {
           batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValue", [data.choice]) });
           batch4Map.push({ key, field: 'support_choice' });
+          if (this.wallet) {
+            batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValueAddress", [data.choice, this.wallet]) });
+            batch4Map.push({ key, field: 'my_support' });
+          }
         }
         if (currentValue !== undefined && (!data.leader || !data.leader.eq(BigNumber.from(String(currentValue)))) && (!data.choice || !data.choice.eq(BigNumber.from(String(currentValue))))) {
           batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValue", [BigNumber.from(String(currentValue))]) });
@@ -515,6 +536,10 @@ export class EVMBridgeGovernance {
         if (data.choice && data.choice !== ethers.constants.AddressZero) {
           batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValue", [data.choice]) });
           batch4Map.push({ key, field: 'support_choice' });
+          if (this.wallet) {
+            batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValueAddress", [data.choice, this.wallet]) });
+            batch4Map.push({ key, field: 'my_support' });
+          }
         }
         if (currentValue && currentValue !== ethers.constants.AddressZero && data.leader !== currentValue && data.choice !== currentValue) {
           batch4.push({ target: addr, callData: iface.encodeFunctionData("votesByValue", [currentValue]) });
@@ -530,6 +555,10 @@ export class EVMBridgeGovernance {
           const choiceKey = ethers.utils.solidityKeccak256(data.periodsChoice.map(() => 'uint256'), data.periodsChoice);
           batch4.push({ target: addr, callData: arrayIface.encodeFunctionData("votesByValue", [choiceKey]) });
           batch4Map.push({ key, field: 'support_choice' });
+          if (this.wallet) {
+            batch4.push({ target: addr, callData: arrayIface.encodeFunctionData("votesByValueAddress", [choiceKey, this.wallet]) });
+            batch4Map.push({ key, field: 'my_support' });
+          }
         }
         if (isArray(currentValue) && currentValue.length > 0) {
           const currentKey = ethers.utils.solidityKeccak256(currentValue.map(() => 'uint256'), currentValue);
@@ -549,7 +578,8 @@ export class EVMBridgeGovernance {
         if (!result.success) return;
         const { key, field } = batch4Map[i];
         const iface = getIfaceByType(this.parameterList[key].type);
-        const value = BigNumber.from(iface.decodeFunctionResult("votesByValue", result.returnData)[0]);
+        const fn = field === 'my_support' ? "votesByValueAddress" : "votesByValue";
+        const value = BigNumber.from(iface.decodeFunctionResult(fn, result.returnData)[0]);
         paramData[key][field] = value;
       });
     }
@@ -585,6 +615,9 @@ export class EVMBridgeGovernance {
         leader,
         challenging_period_start_ts: data.challenging_period_start_ts || undefined,
         contract_address: voteAddresses[name],
+        // How much of the wallet's balance is already counted for its own choice. A repeat vote
+        // recounts the current balance, so it only adds something while this is below it.
+        my_support: your_choice !== undefined && data.my_support ? data.my_support.toString() : undefined,
         supports: {},
         choices: {}
       };

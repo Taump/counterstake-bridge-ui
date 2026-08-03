@@ -1,6 +1,6 @@
 import { InfoCircleOutlined } from "@ant-design/icons"
 import { Card, Button, Tooltip, Statistic } from "antd"
-import { isEqual, isNumber } from "lodash";
+import { isArray, isEqual, isNumber } from "lodash";
 import { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 
@@ -23,7 +23,7 @@ const { Countdown } = Statistic;
 /* eslint eqeqeq: "off" */
 
 export const GovernanceItem = (props) => {
-  const { name, value, selectedBridgeAddress, activeGovernance, choice, bridge_network, leader, voteTokenDecimals, voteTokenSymbol, stakeTokenDecimals, stakeTokenSymbol, challenging_period, freeze_period, supports = {}, challenging_period_start_ts, change, balance, activeWallet, contract_address } = props;
+  const { name, value, selectedBridgeAddress, activeGovernance, choice, bridge_network, leader, voteTokenDecimals, voteTokenSymbol, stakeTokenDecimals, stakeTokenSymbol, challenging_period, freeze_period, supports = {}, challenging_period_start_ts, change, balance, activeWallet, contract_address, my_support } = props;
   const { rule, description } = getParameterList(bridge_network)?.[name];
 
   const valueView = viewParam({ name, value, network: bridge_network, stakeTokenDecimals, stakeTokenSymbol });
@@ -114,6 +114,13 @@ export const GovernanceItem = (props) => {
     }
   }
 
+  // How much support your own choice already has from you. Obyte keeps it per address in
+  // supports, EVM reads votesByValueAddress into my_support.
+  const choiceKey = isArray(choice) ? choice.join(" ") : choice;
+  const myChoiceSupport = bridge_network === "Obyte"
+    ? supports[choiceKey]?.find((s) => s.address === activeWallet)?.support
+    : my_support;
+
   const metamaskInstalledOrNotRequired = bridge_network === "Obyte" || window.ethereum;
   const lockedAsLeader = choice !== undefined && isFrozen && (choice == leader || isEqual(leader, choice));
   const changeDisabledReason = lockedAsLeader ? "Your vote is the leader and is locked until the challenging and freeze periods expire." : undefined;
@@ -160,7 +167,7 @@ export const GovernanceItem = (props) => {
       {supportsByValue.map(({ value, supports: supportedValue }, i) => <div key={i + " " + value} className={styles.listOfVotersItem}>
         <div className={styles.listOfVotersValue}>{width <= 780 && <b>Value: </b>}<span className={name === "oracles" ? "evmHashOrAddress" : ""}>{viewParam({ name, value, network: bridge_network, stakeTokenDecimals, stakeTokenSymbol })}</span></div>
         <div className={styles.listOfVotersSupport}>{width <= 780 && <b>Support: </b>} <SupportListModal sum={+Number(supportedValue / 10 ** voteTokenDecimals).toFixed(voteTokenDecimals)} decimals={voteTokenDecimals} symbol={voteTokenSymbol} supportList={supports[value]} bridge_network={bridge_network} /> </div>
-        <div className={styles.listOfVotersAction}><ChangeParamsModal change={change} {...props} disabled={lockedAsLeader || !activeWallet || !metamaskInstalledOrNotRequired} disabledReason={changeDisabledReason} rule={rule} description={description} balance={balance} supportedValue={value} isMyChoice={choice !== undefined && (isNumber(choice) ? Number(choice) === Number(value) : choice === value)} /></div>
+        <div className={styles.listOfVotersAction}><ChangeParamsModal change={change} {...props} disabled={lockedAsLeader || !activeWallet || !metamaskInstalledOrNotRequired} disabledReason={changeDisabledReason} rule={rule} description={description} balance={balance} supportedValue={value} isMyChoice={choice !== undefined && (isNumber(choice) ? Number(choice) === Number(value) : choice === value)} myChoiceSupport={myChoiceSupport} /></div>
       </div>)}
     </div>}
     <div className={styles.listOfVotersAnotherValue}>
