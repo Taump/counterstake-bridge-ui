@@ -39,7 +39,7 @@ export const getParameterList = (network) => ({
     description: "Minimum stake amount.",
     rule: "The value of the min_stake parameter must be integer greater than or equal to 0",
     initValue: network === "Obyte" ? 100000 : 0,
-    validator: (value, {stakeTokenDecimals = 0}) => value >= 0 && f(value) <= stakeTokenDecimals
+    validator: (value, { stakeTokenDecimals = 0 }) => value >= 0 && f(value) <= stakeTokenDecimals
   },
   large_threshold: {
     name: "large_threshold",
@@ -48,7 +48,7 @@ export const getParameterList = (network) => ({
     rule: "The value of the large_threshold parameter must be integer greater than or equal to 0",
     initValue: network === "Obyte" ? 100000000 : 0,
     validator: (value, meta = {}) => {
-      const {stakeTokenDecimals = 0} = meta;
+      const { stakeTokenDecimals = 0 } = meta;
       return value >= 0 && f(value) <= stakeTokenDecimals;
     }
   },
@@ -83,9 +83,12 @@ export const getParameterList = (network) => ({
     evm_name: "oracleAddress",
     type: "address",
     description: "Oracles that report the price of foreign asset in terms of stake asset.",
+    rule: network === "Obyte"
+      ? "Up to 3 oracles formatted as ADDRESS*FEED_NAME or ADDRESS/FEED_NAME separated by space"
+      : `The value of the oracle parameter must be a valid ${network} address`,
     initValue: 1,
     importOnly: true,
-    validator: value => is_valid_oracle_string(value)
+    validator: value => is_valid_oracle_string(value, network)
   }
 });
 
@@ -107,27 +110,30 @@ export const is_valid_challenging_periods_string = (value) => {
 
     prev = nPeriod;
   });
-  
+
   return !isError
 }
 
 export const is_valid_oracle_string = (value, network) => {
   if (network === "Obyte") {
+    if (!value || typeof value !== "string") return false;
     let isError = false;
-    const pairs = value.split(" ");
-    if (pairs > 3) return false
+    const pairs = value.trim().split(" ");
+    if (pairs.length > 3 || pairs.length === 0) return false;
     pairs.forEach((pair) => {
       const oracle = String(pair).substring(0, 32);
       if (!obyte.utils.isValidAddress(oracle)) return isError = true;
       const op = String(pair).substring(32, 33);
       if (op !== '*' && op !== '/') return isError = true;
+      const feed_name = String(pair).substring(33);
+      if (!feed_name) return isError = true;
     });
-    return !isError
+    return !isError;
   } else {
     try {
-      return ethers.utils.getAddress(value) === value
+      return ethers.utils.getAddress(value) === value;
     } catch (e) {
-      return false
+      return false;
     }
   }
-}
+};
