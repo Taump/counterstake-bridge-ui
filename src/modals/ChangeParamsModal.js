@@ -61,7 +61,7 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
   const parameterInfo = parameterList?.[name];
 
   useEffect(() => {
-    if (name === "oracles" && oracles) {
+    if (name === "oracles" && oracles && bridge_network === "Obyte") {
       const oraclesArray = [];
       const { feed_name1, feed_name2, feed_name3, oracle1, oracle2, oracle3, op1, op2, op3 } = oracles;
       if (oracle1 && feed_name1 && op1 && obyte.utils.isValidAddress(oracle1)) {
@@ -86,7 +86,7 @@ export const ChangeParamsModal = ({ supportedValue, description, name, activeGov
       }
 
     };
-  }, [name, oracles]);
+  }, [name, oracles, bridge_network]);
 
   const vote = async () => {
     if (bridge_network === "Obyte") return;

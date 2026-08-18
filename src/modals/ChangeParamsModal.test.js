@@ -232,3 +232,47 @@ test("loads and displays a composed Obyte oracle price", async () => {
 
   expect(await screen.findByText("1 BNB = 42.5 GBYTE")).toBeInTheDocument();
 });
+
+test("allows voting for an already suggested EVM oracle address without overwriting it", async () => {
+  const oracleAddr = "0x0b93109d05Ef330acD2c75148891cc61D20C3EF1";
+  const changeParam = await voteForSupportedValue({
+    name: "oracles",
+    supportedValue: oracleAddr,
+    balance: "480030000000000"
+  });
+
+  expect(changeParam).toHaveBeenCalledWith("oracles", oracleAddr, undefined, expect.any(Function));
+});
+
+test("validates and votes for a new EVM oracle address", async () => {
+  const changeParam = jest.fn();
+  EVMBridgeGovernance.mockImplementation(() => ({ changeParam }));
+
+  render(<ChangeParamsModal
+    {...defaultProps}
+    name="oracles"
+    balance="480030000000000"
+  />);
+
+  fireEvent.click(screen.getByRole("button", { name: "suggest another value" }));
+
+  const input = screen.getByPlaceholderText("oracles");
+  const voteBtn = screen.getByRole("button", { name: "Vote" });
+
+  // Invalid address disables the vote button and displays rule error
+  fireEvent.change(input, { target: { value: "invalid-address" } });
+  expect(screen.getByRole("button", { name: "Vote" })).toBeDisabled();
+  expect(screen.getByText("The value of the oracle parameter must be a valid EVM address")).toBeInTheDocument();
+
+  // Valid checksummed address enables the vote button
+  const validOracle = "0x0b93109d05Ef330acD2c75148891cc61D20C3EF1";
+  fireEvent.change(input, { target: { value: validOracle } });
+  expect(screen.getByRole("button", { name: "Vote" })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Vote" }));
+  await waitFor(() => expect(changeParam).toHaveBeenCalledWith("oracles", validOracle, undefined, expect.any(Function)));
+});
+
+
+
+
