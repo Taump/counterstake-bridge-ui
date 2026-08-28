@@ -49,6 +49,11 @@ export const MainMenu = ({ mode, pathname, onClose }) => {
           Pooled assistants
         </NavLink>
       </Menu.Item>
+      <Menu.Item key="/audit">
+        <NavLink onClick={onClose} to="/audit" activeClassName="selected" style={{ verticalAlign: "middle" }}>
+          Audit
+        </NavLink>
+      </Menu.Item>
       <Menu.Item key="/create">
         <NavLink onClick={onClose} to="/create" activeClassName="selected" style={{ verticalAlign: "middle" }}>
           Create
