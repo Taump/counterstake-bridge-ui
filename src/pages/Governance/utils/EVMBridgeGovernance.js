@@ -403,7 +403,7 @@ export class EVMBridgeGovernance {
       const oracleResult = results1[21];
       if (minPriceResult.success) {
         const min_priceBn = ethers.utils.defaultAbiCoder.decode(['uint256'], minPriceResult.returnData)[0];
-        initValues.min_price = { value: min_priceBn ? +ethers.utils.formatUnits(BigNumber.from(min_priceBn), 20).toString() : undefined };
+        initValues.min_price = { value: BigNumber.from(min_priceBn).toString() };
       }
       if (oracleResult.success) {
         initValues.oracles = { value: ethers.utils.defaultAbiCoder.decode(['address'], oracleResult.returnData)[0] };
