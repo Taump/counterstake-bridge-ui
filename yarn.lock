@@ -9039,7 +9039,7 @@ obyte-qr-button@^0.0.10:
     qrcode.react "^1.0.1"
     react-string-replace "^0.4.4"
 
-obyte@0.2.0:
+obyte@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/obyte/-/obyte-0.2.0.tgz#95cb610d8afae34be601d1cb6b30447ea9a629a1"
   integrity sha512-FU/SxxDWpn6WF1fzFDE7bxbCuaWeHp//stGCGkKWhMK5mjlp16pB8SClHE0ZiqjIn7jCtv2q43uQ85aNxx3CkQ==
