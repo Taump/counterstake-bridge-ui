@@ -1,16 +1,22 @@
 import { BigNumber, ethers } from "ethers";
 
 import { assistantFactoryAbi, counterstakeFactoryAbi } from "abi";
-import { nativeSymbols } from "nativeSymbols";
 import { getFactoryContractAddressByNetwork } from "pages/Create/utils/createBridgeOnEVM";
 import { evmAssistantFactories } from "pages/Create/utils/createPooledAssistantOnEVM";
 import { getParameterList } from "pages/Governance/utils/getParameterList";
 import { providers } from "services/evm";
-import { fetchCryptocompareExchangeRateCached } from "utils/fetchExchangeRateInUSD";
+import { getTokenPriceInUsd } from "services/prices";
 import { oracleAddresses } from "../ConfigurationStep";
 import config from "appConfig";
 
 const environment = config.ENVIRONMENT;
+
+// the callers show an error state when the estimate throws, so an unknown price must throw too
+const getNativePriceInUsd = async (network) => {
+  const price = await getTokenPriceInUsd(ethers.constants.AddressZero, network);
+  if (!price) throw new Error(`no USD price for the native coin of ${network}`);
+  return price;
+}
 
 export const estimateGasForCreationBridge = async ({ home_network, foreign_network, assistantsWillBeCreated }) => {
   let fullFee = 0;
@@ -30,8 +36,7 @@ export const estimateGasForCreationBridge = async ({ home_network, foreign_netwo
     const estimateGas = await contract.estimateGas.createImport("Obyte", "base", "foreign_description", "ESTIMATE", ethers.constants.AddressZero, oracles, 150, 100, "10000000000000000000", challenging_periods, large_challenging_periods);
 
     const gasPrice = await provider.getGasPrice();
-    const currentNativeSymbol = nativeSymbols[foreign_network];
-    const nativePriceInUSD = await fetchCryptocompareExchangeRateCached(currentNativeSymbol, "USD");
+    const nativePriceInUSD = await getNativePriceInUsd(foreign_network);
     const gasPriceInUSD = gasPrice.toNumber() * nativePriceInUSD;
 
     fullFee = (estimateGas.toNumber() / 1e18) * gasPriceInUSD;
@@ -50,8 +55,7 @@ export const estimateGasForCreationBridge = async ({ home_network, foreign_netwo
     const estimateGas = await contract.estimateGas.createExport(foreign_network, "oMdNe66UXHhPWMCzzFQZD1edTmgXJpMRAb5GfPwW+b4=", "0x9ACECb31B2511d9ED421d50F55a7cFCACb04D885", 150, 100, "10000000000000000000", challenging_periods, large_challenging_periods);
 
     const gasPrice = await provider.getGasPrice();
-    const currentNativeSymbol = nativeSymbols[home_network];
-    const nativePriceInUSD = await fetchCryptocompareExchangeRateCached(currentNativeSymbol, "USD");
+    const nativePriceInUSD = await getNativePriceInUsd(home_network);
     const gasPriceInUSD = gasPrice.toNumber() * nativePriceInUSD;
 
     fullFee = fullFee + (estimateGas.toNumber() / 1e18) * gasPriceInUSD;
@@ -78,8 +82,7 @@ export const estimateGasForCreationAssistant = async (network, type) => { // typ
 
   if (contractAddress) {
     const contract = new ethers.Contract(contractAddress, assistantFactoryAbi, provider);
-    const currentNativeSymbol = nativeSymbols[network];
-    const nativePriceInUSD = await fetchCryptocompareExchangeRateCached(currentNativeSymbol, "USD");
+    const nativePriceInUSD = await getNativePriceInUsd(network);
     const gasPriceInUSD = gasPrice.toNumber() * nativePriceInUSD;
 
     let estimateGas;

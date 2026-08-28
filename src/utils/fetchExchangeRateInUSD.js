@@ -3,36 +3,25 @@ import { ethers } from "ethers";
 import { nativeSymbols } from "nativeSymbols";
 import config from "appConfig";
 
+import { Cache } from "./Cache";
+
 const environment = config.ENVIRONMENT;
 
 const cache_lifetime = 10 * 60 * 1000; // 10 minutes
 
-class Cache {
-  #data = {};
+// Only the short-lived, in-memory cache the file always had: callers go through
+// services/prices, which persists whatever these APIs answer.
+const cache = new Cache(cache_lifetime);
 
-  get(key) {
-    const record = this.#data[key];
-    if (!record)
-      return null;
-    if (record.ts < Date.now() - cache_lifetime) // expired
-      return null;
-    return record.value;
-  }
-
-  put(key, value) {
-    this.#data[key] = { value, ts: Date.now() };
-  }
-}
-
-const cache = new Cache();
-
-function cachify(func, count_args) {
+// `name` keeps the cache key stable: func.name gets mangled by the minifier, which risks two
+// functions sharing one key.
+function cachify(func, count_args, name) {
   return async function () {
     const cached = arguments[count_args]; // the last arg is optional
     const args = [];
     for (let i = 0; i < count_args; i++) // not including the 'cached' arg
       args[i] = arguments[i];
-    const key = func.name + '_' + args.join(',');
+    const key = (name || func.name) + '_' + args.join(',');
     if (cached) {
       const value = cache.get(key);
       if (value !== null) {
@@ -84,17 +73,30 @@ export const fetchERC20ExchangeRate = async (chain, token_address, quote) => {
 	if (!prices[quote]) {
 		if (!prices.usd)
 			throw new Error(`no ${quote} and no usd in response ${JSON.stringify(data)}`);
-		const quote_price_in_usd = await fetchCryptocompareExchangeRateCached(quote, 'USD', true);
+		const quote_price_in_usd = await fetchCoingeckoExchangeRateCached(quote, 'USD', true);
 		return prices.usd / quote_price_in_usd;
 	}
   return prices[quote]
 }
 
-export const fetchCryptocompareExchangeRate = async (in_currency, out_currency) => {
-  const data = await request(`https://min-api.cryptocompare.com/data/price?fsym=${in_currency}&tsyms=${out_currency}`)
-  if (!data[out_currency])
-    throw new Error(`no ${out_currency} in response ${JSON.stringify(data)}`);
-  return data[out_currency]
+// CoinGecko addresses coins by its own ids, not by ticker
+const coingeckoCoinIds = {
+  GBYTE: 'byteball',
+  ETH: 'ethereum',
+  BNB: 'binancecoin',
+  MATIC: 'matic-network',
+  KAVA: 'kava',
+};
+
+export const fetchCoingeckoExchangeRate = async (in_currency, out_currency) => {
+  const id = coingeckoCoinIds[in_currency.toUpperCase()];
+  if (!id)
+    throw new Error(`no CoinGecko id for ${in_currency}`);
+  const vs = out_currency.toLowerCase();
+  const data = await request(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=${vs}`)
+  if (!data?.[id]?.[vs])
+    throw new Error(`no ${out_currency} in CoinGecko response ${JSON.stringify(data)}`);
+  return data[id][vs]
 }
 
 export const fetchObyteTokenPrices = async () => {
@@ -106,9 +108,9 @@ export const fetchObyteTokenPrices = async () => {
 }
 
 
-const fetchERC20ExchangeRateCached = cachify(fetchERC20ExchangeRate, 3)
-export const fetchCryptocompareExchangeRateCached = cachify(fetchCryptocompareExchangeRate, 2)
-const fetchObyteTokenPricesCached = cachify(fetchObyteTokenPrices, 0)
+const fetchERC20ExchangeRateCached = cachify(fetchERC20ExchangeRate, 3, 'erc20')
+const fetchCoingeckoExchangeRateCached = cachify(fetchCoingeckoExchangeRate, 2, 'coingecko')
+const fetchObyteTokenPricesCached = cachify(fetchObyteTokenPrices, 0, 'obytePrices')
 
 const coingeckoChainIds = {
   Ethereum: 'ethereum',
@@ -143,13 +145,13 @@ export const fetchExchangeRateInUSD = async (network, asset, cached) => {
   try {
     if (network === 'Obyte') {
       if (asset === 'base')
-        return await fetchCryptocompareExchangeRateCached('GBYTE', 'USD', cached);
+        return await fetchCoingeckoExchangeRateCached('GBYTE', 'USD', cached);
       const prices = await fetchObyteTokenPricesCached(cached);
       const price_in_usd = prices[asset];
       return price_in_usd || null;
     }
     if (asset === ethers.constants.AddressZero)
-      return await fetchCryptocompareExchangeRateCached(nativeSymbols[network], 'USD', cached);
+      return await fetchCoingeckoExchangeRateCached(nativeSymbols[network], 'USD', cached);
     return await tryGetTokenPrice(network, asset, 'USD', cached);
   } catch (e) {
     console.error('fetchExchangeRateInUSD error', e);
