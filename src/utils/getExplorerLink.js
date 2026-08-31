@@ -23,7 +23,8 @@ export const getExplorerLink = (network, data, type) => {
     case 'Polygon':
       return environment === "testnet" ? `https://mumbai.polygonscan.com/${type || "tx"}/${data}` : `https://polygonscan.com/${type || "tx"}/${data}`;
     case 'Kava':
-      return environment === "testnet" ? `https://explorer.testnet.kava.io/${type || "tx"}/${data}` : `https://explorer.kava.io/${type || "tx"}/${data}`;
+      // explorer.kava.io stopped responding; kavascan serves the same /address, /token and /tx paths
+      return environment === "testnet" ? `https://testnet.kavascan.com/${type || "tx"}/${data}` : `https://kavascan.com/${type || "tx"}/${data}`;
     default: return "#"
   }
 }

@@ -1,0 +1,98 @@
+.audit {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.refresh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.updatedAt {
+  font-size: 12px;
+  opacity: .5;
+}
+
+.cards {
+  margin-bottom: 24px;
+}
+
+.card {
+  height: 100%;
+}
+
+.cardTitle {
+  font-size: 13px;
+  opacity: .65;
+}
+
+.cardValue {
+  font-size: 28px;
+  line-height: 1.2;
+  margin-top: 4px;
+}
+
+.cardFootnote {
+  font-size: 12px;
+  opacity: .45;
+  margin-top: 4px;
+}
+
+/* exactly one line of the value (28px × 1.2) and of the footnote (12px × 1.5), as flex boxes
+   so the bar is centred without adding an inline line box of its own */
+.cardValueSkeleton,
+.cardFootnoteSkeleton {
+  display: flex;
+  align-items: center;
+}
+
+.cardValueSkeleton {
+  height: 33.6px;
+}
+
+.cardFootnoteSkeleton {
+  height: 18px;
+}
+
+/* antd's default skeleton is light-theme grey; this is the shimmer index.css gives the assistants page */
+.audit :global(.ant-skeleton-element) {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.audit :global(.ant-skeleton-element .ant-skeleton-input) {
+  min-width: 0;
+  border-radius: 4px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, #262626 40%, #2d2d2d 50%, #262626 60%) right / 300% 100%;
+  animation: skeleton-loading 1.5s linear infinite;
+}
+
+.audit :global(.ant-table-summary > tr > td) {
+  background: #1d1d1d;
+  border-top: 1px solid #434343;
+}
+
+.audit :global(.ant-table-thead > tr > th) {
+  font-weight: 400;
+  opacity: .85;
+}
+
+@media (max-width: 560px) {
+  .cardValue {
+    font-size: 24px;
+  }
+
+  .cardValueSkeleton {
+    height: 28.8px;
+  }
+}

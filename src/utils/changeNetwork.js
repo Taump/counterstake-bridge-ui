@@ -40,7 +40,7 @@ const rpcMeta = {
         decimals: 18
       },
       rpcUrls: ['https://evm.kava.io'],
-      blockExplorerUrls: ['https://explorer.kava.io/'],
+      blockExplorerUrls: ['https://kavascan.com/'],
     },
   },
   testnet: {
@@ -79,7 +79,7 @@ const rpcMeta = {
         decimals: 18
       },
       rpcUrls: ['https://evm.testnet.kava.io'],
-      blockExplorerUrls: ['https://explorer.testnet.kava.io/'],
+      blockExplorerUrls: ['https://testnet.kavascan.com/'],
     },
   },
   devnet: {
