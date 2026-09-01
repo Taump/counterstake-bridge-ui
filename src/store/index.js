@@ -24,6 +24,8 @@ import chainIdSlice from './chainIdSlice';
 import assistantsSlice from './assistantsSlice';
 import settingsSlice from './settingsSlice';
 import tokenRegistrySlice from './tokenRegistrySlice';
+import bridgesSlice from './bridgesSlice';
+import auditSlice from './auditSlice';
 
 import config from "appConfig";
 
@@ -40,7 +42,9 @@ const rootReducer = combineReducers({
   chainId: chainIdSlice,
   settings: settingsSlice,
   assistants: assistantsSlice,
-  tokenRegistryState: tokenRegistrySlice
+  tokenRegistryState: tokenRegistrySlice,
+  bridges: bridgesSlice,
+  audit: auditSlice
 });
 
 const persistConfig = {

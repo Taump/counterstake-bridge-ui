@@ -17,7 +17,8 @@ import {
   MainPage,
   GovernancePage,
   AssistantsPage,
-  CreatePage
+  CreatePage,
+  AuditPage
 } from "./pages";
 
 
@@ -64,6 +65,7 @@ const AppRouter = () => {
         <Route path="/governance/:address?" component={GovernancePage} />
         <Route path="/assistants" component={AssistantsPage} />
         <Route path="/create" component={CreatePage} />
+        <Route path="/audit" component={AuditPage} />
         <Route path="/" component={MainPage} exact />
       </MainLayout>
     </Router>

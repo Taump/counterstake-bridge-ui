@@ -2,6 +2,7 @@ import { getBridges, getTransferStatus } from "services/api";
 import { startWatchingDestinationBridge } from "services/watch";
 import { getOrInsertInput } from "utils";
 import { setDirections } from "./directionsSlice";
+import { setBridges, setBridgesFailed, setBridgesLoading } from "./bridgesSlice";
 import obyte from "../services/socket";
 import { setGovernanceList } from "./governanceSlice";
 import { updateExportedTokens } from "./settingsSlice";
@@ -47,14 +48,27 @@ export const getCoinIcons = createAsyncThunk(
 export const updateBridges = createAsyncThunk(
   'update/updateBridges',
   async (_, thunkAPI) => {
-    const resp = await getBridges();
-    if (resp.status !== 'success')
+    thunkAPI.dispatch(setBridgesLoading());
+
+    let resp;
+    try {
+      resp = await getBridges();
+    } catch (e) {
+      thunkAPI.dispatch(setBridgesFailed(e.message));
+      throw e;
+    }
+
+    if (resp.status !== 'success') {
+      thunkAPI.dispatch(setBridgesFailed(resp.error || 'bad response from the backend'));
       return [];
+    }
 
     const { governance, directions: lastDirections } = thunkAPI.getState();
     const governanceListExists = Object.keys(governance.exportList || {}).length > 0 || Object.keys(governance.importList || {}).length > 0;
 
     const bridges = resp.data;
+    thunkAPI.dispatch(setBridges(bridges)); // the raw list, used by the audit page
+
     let directions = {};
     let inputs = [];
     const import_aas = {};
